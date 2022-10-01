@@ -1,6 +1,8 @@
-﻿namespace DuplicateFinder.Bl.Storage;
+﻿using System;
 
-internal class HashedFile
+namespace DuplicateFinder.Bl.Storage;
+
+public class HashedFile
 {
 	public string Path { get; }
 	public byte[] Hash { get; }
@@ -15,7 +17,7 @@ internal class HashedFile
 
 	protected bool Equals(HashedFile other)
 	{
-		return Path == other.Path && Hash.Equals(other.Hash);
+		return Path == other.Path && Hash.SequenceEqual(other.Hash);
 	}
 
 	public override bool Equals(object obj)
@@ -28,6 +30,11 @@ internal class HashedFile
 
 	public override int GetHashCode()
 	{
-		return HashCode.Combine(Path, Hash);
+		int hash = 0;
+		foreach (var element in Hash)
+		{
+			hash = hash * 31 + element.GetHashCode();
+		}
+		return HashCode.Combine(Path, hash);
 	}
 }

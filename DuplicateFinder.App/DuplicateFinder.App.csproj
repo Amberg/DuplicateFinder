@@ -11,4 +11,8 @@
     <PackageReference Include="Hangfire.MemoryStorage" Version="1.7.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\DuplicateFinder.Bl\DuplicateFinder.Bl.csproj" />
+  </ItemGroup>
+
 </Project>

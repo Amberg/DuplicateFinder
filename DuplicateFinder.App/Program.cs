@@ -1,8 +1,9 @@
+using DuplicateCheck;
+using DuplicateFinder.Bl.Storage;
 using Hangfire;
 using Hangfire.MemoryStorage;
-using Microsoft.Extensions.Options;
 
-namespace DuplicateFinder
+namespace DuplicateFinder.App
 {
 	public class Program
 	{
@@ -16,6 +17,9 @@ namespace DuplicateFinder
 			builder.Services.AddHangfire(c => c.UseMemoryStorage());
 			builder.Services.AddHangfireServer();
 
+			builder.Services.Configure<Settings>(builder.Configuration.GetSection("Settings"));
+			RegisterComponents(builder.Services);
+			
 			var app = builder.Build();
 
 			// Configure the HTTP request pipeline.
@@ -29,11 +33,24 @@ namespace DuplicateFinder
 
 			app.UseAuthorization();
 			app.MapRazorPages();
-
 			app.UseHangfireDashboard("/hangfire");
+			ConfigureBackgroundJobs(app.Services);
 
 			app.Run();
+		}
 
+
+
+		private static void RegisterComponents(IServiceCollection services)
+		{
+			services.AddSingleton<IHashStorage, HashStorage>();
+			services.AddSingleton<Bl.DuplicateFinder>();
+		}
+
+		private static void ConfigureBackgroundJobs(IServiceProvider serviceCollection)
+		{
+			serviceCollection.GetService<IRecurringJobManager>()
+				.AddOrUpdate("Find Duplicates", (Bl.DuplicateFinder m) => m.SearchDuplicates(), Cron.Hourly());
 		}
 	}
 }

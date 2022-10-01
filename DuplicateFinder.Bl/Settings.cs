@@ -1,6 +1,6 @@
 ﻿namespace DuplicateCheck
 {
-	internal class Settings
+	public class Settings
 	{
 		public List<string> Folders
 		{

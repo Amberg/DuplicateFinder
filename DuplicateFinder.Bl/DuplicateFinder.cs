@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace DuplicateFinder.Bl
 {
-	internal class DuplicateFinder
+	public class DuplicateFinder
 	{
 		private readonly Settings m_settings;
 		private readonly ILogger<DuplicateFinder> m_logger;
@@ -22,23 +22,40 @@ namespace DuplicateFinder.Bl
 
 		public void SearchDuplicates()
 		{
+			m_logger.LogInformation("Check for duplicates:");
 			var folders = m_hashStorage.DetermineModifiedFolders(m_settings.Folders);
+			if (!folders.Any())
+			{
+				m_logger.LogInformation("No new files detected");
+			}
+
+			var counter = 0;
 			foreach (var folder in folders)
 			{
 				var files = Directory.GetFiles(folder, "*", SearchOption.TopDirectoryOnly);
 				foreach (var file in files)
 				{
+					if (m_hashStorage.IsHashUpToDate(file))
+					{
+						continue;
+					}
 					ProcessFile(file);
+					counter++;
 				}
 			}
 
-			m_hashStorage.Persist();
+			if (counter > 0)
+			{
+				m_hashStorage.Persist();
+			}
+			m_logger.LogInformation($"Hashed {counter} files");
 		}
 		
 		public void ProcessFile(string file)
 		{
 			try
 			{
+				m_logger.LogInformation($"hashing file {file}");
 				using MD5 md5 = MD5.Create();
 				var data = ReadFile(file, out var length);
 				var hash = md5.ComputeHash(data, 0, length);
@@ -49,7 +66,6 @@ namespace DuplicateFinder.Bl
 			{
 				m_logger.LogWarning(ex.Message);
 			}
-
 		}
 
 		byte[] ReadFile(string path, out int length)

@@ -3,11 +3,12 @@ using Microsoft.Extensions.Logging;
 
 namespace DuplicateFinder.Bl.Storage
 {
-	internal class HashStorage : IHashStorage
+	public class HashStorage : IHashStorage
 	{
 		private readonly ILogger<HashStorage> m_logger;
 		private const string HashFileName = "hashes.dat";
-		private HashSet<HashedFile> m_files = new HashSet<HashedFile>();
+		private readonly HashSet<HashedFile> m_files = new HashSet<HashedFile>();
+		private readonly Dictionary<string, HashedFile> m_pathHashLookup = new Dictionary<string, HashedFile>();
 
 		public HashStorage(ILogger<HashStorage> logger)
 		{
@@ -25,6 +26,7 @@ namespace DuplicateFinder.Bl.Storage
 					foreach (var value in JsonSerializer.Deserialize<HashedFile[]>(File.ReadAllText(HashFileName))!)
 					{
 						m_files.Add(value);
+						m_pathHashLookup[value.Path] = value;
 					}
 				}
 			}
@@ -52,7 +54,13 @@ namespace DuplicateFinder.Bl.Storage
 
 		public void AddNewItem(HashedFile hashedFile)
 		{
-			m_files.Add(hashedFile);
+			if (!m_files.Add(hashedFile))
+			{
+				// only the case if something went wrong -- add same file again to update HashDate
+				m_files.Remove(hashedFile);
+				m_files.Add(hashedFile);
+			}
+			m_pathHashLookup[hashedFile.Path] = hashedFile;
 		}
 		
 		public void Persist()
@@ -60,6 +68,10 @@ namespace DuplicateFinder.Bl.Storage
 			File.WriteAllText(HashFileName, JsonSerializer.Serialize(m_files.ToArray()));
 		}
 
+		public bool IsHashUpToDate(string file)
+		{
+			return m_pathHashLookup.TryGetValue(file, out var hashedFile) && hashedFile.HashDate > File.GetLastWriteTimeUtc(file);
+		}
 
 		/// <summary>
 		/// Compares the last write time of the folders with the oldest hash time to
@@ -99,7 +111,7 @@ namespace DuplicateFinder.Bl.Storage
 				{
 					result.Add(folder);
 				}
-				else if (Directory.GetLastWriteTimeUtc(folder) > oldestHash)
+				else if (Directory.GetFiles(folder, "*", SearchOption.TopDirectoryOnly).Max(File.GetLastWriteTimeUtc) > oldestHash)
 				{
 					result.Add(folder);
 				}
