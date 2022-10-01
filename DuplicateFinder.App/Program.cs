@@ -1,3 +1,7 @@
+using Hangfire;
+using Hangfire.MemoryStorage;
+using Microsoft.Extensions.Options;
+
 namespace DuplicateFinder
 {
 	public class Program
@@ -8,6 +12,9 @@ namespace DuplicateFinder
 
 			// Add services to the container.
 			builder.Services.AddRazorPages();
+
+			builder.Services.AddHangfire(c => c.UseMemoryStorage());
+			builder.Services.AddHangfireServer();
 
 			var app = builder.Build();
 
@@ -21,10 +28,12 @@ namespace DuplicateFinder
 			app.UseRouting();
 
 			app.UseAuthorization();
-
 			app.MapRazorPages();
 
+			app.UseHangfireDashboard("/hangfire");
+
 			app.Run();
+
 		}
 	}
 }
