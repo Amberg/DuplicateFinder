@@ -1,5 +1,8 @@
-﻿using System.Text.Json;
+﻿using System.Collections.Generic;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic.FileIO;
+using SearchOption = System.IO.SearchOption;
 
 namespace DuplicateFinder.Bl.Storage
 {
@@ -41,15 +44,16 @@ namespace DuplicateFinder.Bl.Storage
 			return m_files;
 		}
 
-		public bool FindDuplicate(byte[] hash, out IEnumerable<HashedFile> existing)
+		public IEnumerable<HashedFile> FindDuplicates()
 		{
-			existing = m_files.Where(x => x.Hash.SequenceEqual(hash));
-			return existing.Any();
+			return m_files.GroupBy(x => x.Hash, new ByteArrayComparer()).FirstOrDefault(x => x.Count() > 1) 
+			       ?? (IEnumerable<HashedFile>)new List<HashedFile>();
 		}
 
 		public void Remove(HashedFile existing)
 		{
 			m_files.Remove(existing);
+			m_pathHashLookup.Remove(existing.Path);
 		}
 
 		public void AddNewItem(HashedFile hashedFile)
@@ -71,6 +75,25 @@ namespace DuplicateFinder.Bl.Storage
 		public bool IsHashUpToDate(string file)
 		{
 			return m_pathHashLookup.TryGetValue(file, out var hashedFile) && hashedFile.HashDate > File.GetLastWriteTimeUtc(file);
+		}
+
+		public void Choose(string path)
+		{
+			try
+			{
+				if (m_pathHashLookup.TryGetValue(path, out var hash))
+				{
+					foreach (var hashedFile in m_files.Where(x => x.Hash.SequenceEqual(hash.Hash) && x.Path != path))
+					{
+						FileSystem.DeleteFile(hashedFile.Path, UIOption.AllDialogs, RecycleOption.SendToRecycleBin, UICancelOption.ThrowException);
+						Remove(hashedFile);
+					}
+				}
+			}
+			catch(Exception ex)
+			{
+				m_logger.LogError(ex, $"Could not delete file {path}");
+			}
 		}
 
 		/// <summary>
@@ -123,6 +146,24 @@ namespace DuplicateFinder.Bl.Storage
 		public IReadOnlyCollection<string> GetHashedFolders()
 		{
 			return m_files.Select(x => Path.GetDirectoryName(x.Path)).Where(x => x != null).Distinct().ToList()!;
+		}
+
+		private class ByteArrayComparer : EqualityComparer<byte[]>
+		{
+			public override bool Equals(byte[] x, byte[] y)
+			{
+				return x == y || x.SequenceEqual(y);
+			}
+
+			public override int GetHashCode(byte[] obj)
+			{
+				var hash = 0;
+				foreach (var element in obj)
+				{
+					hash = hash * 31 + element.GetHashCode();
+				}
+				return hash;
+			}
 		}
 	}
 }

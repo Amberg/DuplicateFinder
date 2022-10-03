@@ -1,0 +1,26 @@
+﻿@model DuplicatesModel
+
+
+<div class="container">
+    
+    @if (Model.Duplicates.Any())
+    {
+        @foreach (var duplicate in Model.Duplicates)
+        {
+            <div class="row">
+                <div class="col-8 img-wrap">
+                    <img src="@Url.Action("GetImage", new {path = duplicate})"/>
+                </div>
+                <div class="col-4">
+                    <text>@duplicate</text>
+                    <button onclick="location.href='@Url.Action("Choose", new{path=@duplicate})'">Behalten</button>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div>Keine Duplikate gefunden</div>
+    }
+
+</div>

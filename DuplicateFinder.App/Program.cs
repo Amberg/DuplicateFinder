@@ -12,34 +12,37 @@ namespace DuplicateFinder.App
 			var builder = WebApplication.CreateBuilder(args);
 
 			// Add services to the container.
-			builder.Services.AddRazorPages();
+			builder.Services.AddControllersWithViews();
 
 			builder.Services.AddHangfire(c => c.UseMemoryStorage());
 			builder.Services.AddHangfireServer();
 
 			builder.Services.Configure<Settings>(builder.Configuration.GetSection("Settings"));
 			RegisterComponents(builder.Services);
-			
+
 			var app = builder.Build();
 
 			// Configure the HTTP request pipeline.
 			if (!app.Environment.IsDevelopment())
 			{
-				app.UseExceptionHandler("/Error");
+				app.UseExceptionHandler("/Home/Error");
 			}
+
 			app.UseStaticFiles();
 
 			app.UseRouting();
 
 			app.UseAuthorization();
-			app.MapRazorPages();
+
+			app.MapControllerRoute(
+				name: "default",
+				pattern: "{controller=Home}/{action=Index}/{id?}");
+
 			app.UseHangfireDashboard("/hangfire");
 			ConfigureBackgroundJobs(app.Services);
 
 			app.Run();
 		}
-
-
 
 		private static void RegisterComponents(IServiceCollection services)
 		{
@@ -51,6 +54,7 @@ namespace DuplicateFinder.App
 		{
 			serviceCollection.GetService<IRecurringJobManager>()
 				.AddOrUpdate("Find Duplicates", (Bl.DuplicateFinder m) => m.SearchDuplicates(), Cron.Hourly());
+
 		}
 	}
 }
