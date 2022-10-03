@@ -1,3 +1,5 @@
 /.vs
 /**/obj
 /**/bin
+/DuplicateFinder.App/hashes.dat
+/publish

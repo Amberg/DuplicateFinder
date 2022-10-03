@@ -15,7 +15,7 @@ namespace DuplicateFinder.App
 			builder.Services.AddControllersWithViews();
 
 			builder.Services.AddHangfire(c => c.UseMemoryStorage());
-			builder.Services.AddHangfireServer();
+			builder.Services.AddHangfireServer(o => o.WorkerCount = 1);
 
 			builder.Services.Configure<Settings>(builder.Configuration.GetSection("Settings"));
 			RegisterComponents(builder.Services);

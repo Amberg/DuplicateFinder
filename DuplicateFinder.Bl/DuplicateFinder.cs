@@ -1,5 +1,4 @@
-﻿using System.Buffers;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using DuplicateCheck;
 using DuplicateFinder.Bl.Storage;
 using Microsoft.Extensions.Logging;
@@ -32,6 +31,7 @@ namespace DuplicateFinder.Bl
 			var counter = 0;
 			foreach (var folder in folders)
 			{
+				m_logger.LogInformation($"hashing folder {folder}");
 				var files = Directory.GetFiles(folder, "*", SearchOption.TopDirectoryOnly);
 				foreach (var file in files)
 				{
@@ -42,6 +42,7 @@ namespace DuplicateFinder.Bl
 					ProcessFile(file);
 					counter++;
 				}
+				Console.WriteLine();
 			}
 
 			if (counter > 0)
@@ -55,26 +56,16 @@ namespace DuplicateFinder.Bl
 		{
 			try
 			{
-				m_logger.LogInformation($"hashing file {file}");
+				Console.Write(".");
 				using MD5 md5 = MD5.Create();
-				var data = ReadFile(file, out var length);
-				var hash = md5.ComputeHash(data, 0, length);
-				ArrayPool<byte>.Shared.Return(data);
+				using var fileStream = new FileStream(file, FileMode.Open, FileAccess.Read);
+				var hash = md5.ComputeHash(new BufferedStream(fileStream, 16 * 1024 * 1024));
 				m_hashStorage.AddNewItem(new HashedFile(file, hash, DateTimeOffset.UtcNow));
 			}
 			catch (Exception ex)
 			{
-				m_logger.LogWarning(ex.Message);
+				m_logger.LogWarning(ex, ex.Message);
 			}
-		}
-
-		byte[] ReadFile(string path, out int length)
-		{
-			using var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read);
-			length = (int) fileStream.Length;
-			var buffer = ArrayPool<byte>.Shared.Rent(length);
-			fileStream.Read(buffer, 0, length);
-			return buffer;
 		}
 	}
 }

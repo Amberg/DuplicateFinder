@@ -85,7 +85,7 @@ namespace DuplicateFinder.Bl.Storage
 				{
 					foreach (var hashedFile in m_files.Where(x => x.Hash.SequenceEqual(hash.Hash) && x.Path != path))
 					{
-						FileSystem.DeleteFile(hashedFile.Path, UIOption.AllDialogs, RecycleOption.SendToRecycleBin, UICancelOption.ThrowException);
+						FileSystem.DeleteFile(hashedFile.Path, UIOption.AllDialogs, RecycleOption.SendToRecycleBin);
 						Remove(hashedFile);
 					}
 				}
@@ -134,9 +134,13 @@ namespace DuplicateFinder.Bl.Storage
 				{
 					result.Add(folder);
 				}
-				else if (Directory.GetFiles(folder, "*", SearchOption.TopDirectoryOnly).Max(File.GetLastWriteTimeUtc) > oldestHash)
+				else
 				{
-					result.Add(folder);
+					var files = Directory.GetFiles(folder, "*", SearchOption.TopDirectoryOnly).ToList();
+					if (files.Any() && files.Max(File.GetLastWriteTimeUtc) > oldestHash)
+					{
+						result.Add(folder);
+					}
 				}
 				result.AddRange(DetermineModifiedFoldersInternal(Directory.GetDirectories(folder, "*", SearchOption.TopDirectoryOnly), hashedFolders));
 			}
