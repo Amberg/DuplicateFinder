@@ -5,7 +5,7 @@ https://go.microsoft.com/fwlink/?LinkID=208121.
 <Project>
   <PropertyGroup>
     <_PublishTargetUrl>C:\WORK\DuplicateFinder\DuplicateFinder.App\..\publish</_PublishTargetUrl>
-    <History>True|2022-10-03T09:51:26.8706906Z;True|2022-10-03T11:38:16.5802231+02:00;True|2022-10-03T11:26:14.1103235+02:00;True|2022-10-03T10:46:33.1139349+02:00;</History>
+    <History>True|2022-10-03T12:42:55.6066300Z;False|2022-10-03T14:42:13.0390980+02:00;True|2022-10-03T11:51:26.8706906+02:00;True|2022-10-03T11:38:16.5802231+02:00;True|2022-10-03T11:26:14.1103235+02:00;True|2022-10-03T10:46:33.1139349+02:00;</History>
     <LastFailureDetails />
   </PropertyGroup>
 </Project>

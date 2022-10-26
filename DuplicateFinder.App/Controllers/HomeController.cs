@@ -31,8 +31,18 @@ namespace DuplicateFinder.App.Controllers
 
         public IActionResult GetImage(string path)
         {
+			if(!System.IO.File.Exists(path))
+			{
+				return NotFound();
+			}
 	        return File(new FileStream(path, FileMode.Open, FileAccess.Read), "image/jpg");
         }
+
+        public IActionResult SkipDuplicate()
+        {
+	        m_hashStorage.SkipDuplicate();
+	        return RedirectToAction("Index");
+		}
 
         public IActionResult Choose(string path)
         {

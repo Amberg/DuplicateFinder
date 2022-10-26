@@ -13,5 +13,7 @@ namespace DuplicateFinder.Bl.Storage
 		void Persist();
 		bool IsHashUpToDate(string file);
 		void Choose(string path);
+
+		void SkipDuplicate();
 	}
 }
