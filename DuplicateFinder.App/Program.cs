@@ -2,6 +2,8 @@ using DuplicateCheck;
 using DuplicateFinder.Bl.Storage;
 using Hangfire;
 using Hangfire.MemoryStorage;
+using Xabe.FFmpeg;
+using Xabe.FFmpeg.Downloader;
 
 namespace DuplicateFinder.App
 {
@@ -9,6 +11,8 @@ namespace DuplicateFinder.App
 	{
 		public static void Main(string[] args)
 		{
+			Xabe.FFmpeg.Downloader.FFmpegDownloader.GetLatestVersion(FFmpegVersion.Official).GetAwaiter().GetResult();
+			FFmpeg.SetExecutablesPath(".");
 			var builder = WebApplication.CreateBuilder(args);
 
 			// Add services to the container.

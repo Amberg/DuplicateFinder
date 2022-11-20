@@ -4,8 +4,6 @@ namespace DuplicateFinder.Bl.Storage
 {
 	public interface IHashStorage
 	{
-		public IEnumerable<HashedFile> EnumerateHashedFiles();
-
 		IEnumerable<HashedFile> FindDuplicates();
 		void Remove(HashedFile existing);
 		void AddNewItem(HashedFile hashedFile);

@@ -3,3 +3,5 @@
 /**/bin
 /DuplicateFinder.App/hashes.dat
 /publish
+/DuplicateFinder.App/ffmpeg.exe
+/DuplicateFinder.App/ffprobe.exe

@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using DuplicateFinder.Bl.Storage;
+using Xabe.FFmpeg;
+using System.Resources;
 
 namespace DuplicateFinder.App.Controllers
 {
@@ -29,11 +31,19 @@ namespace DuplicateFinder.App.Controllers
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
 
-        public IActionResult GetImage(string path)
+        public async Task<IActionResult> GetImage(string path)
         {
 			if(!System.IO.File.Exists(path))
 			{
 				return NotFound();
+			}
+
+			if (Path.GetExtension(path) == ".mp4")
+			{
+				string output = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+				IConversion conversion = await FFmpeg.Conversions.FromSnippet.Snapshot(path, output, TimeSpan.FromSeconds(0));
+				IConversionResult result = await conversion.Start();
+				return File(new FileStream(output, FileMode.Open, FileAccess.Read), "image/png");
 			}
 	        return File(new FileStream(path, FileMode.Open, FileAccess.Read), "image/jpg");
         }

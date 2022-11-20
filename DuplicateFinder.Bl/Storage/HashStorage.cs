@@ -12,7 +12,7 @@ namespace DuplicateFinder.Bl.Storage
 		private const string HashFileName = "hashes.dat";
 		private readonly HashSet<HashedFile> m_files = new HashSet<HashedFile>();
 		private readonly Dictionary<string, HashedFile> m_pathHashLookup = new Dictionary<string, HashedFile>();
-		private object m_writeLock = new object();
+		private readonly object m_lock = new object();
 		private int m_skipCount = 0;
 
 		public HashStorage(ILogger<HashStorage> logger)
@@ -28,10 +28,13 @@ namespace DuplicateFinder.Bl.Storage
 			{
 				if (File.Exists(HashFileName))
 				{
-					foreach (var value in JsonSerializer.Deserialize<HashedFile[]>(File.ReadAllText(HashFileName))!)
+					lock (m_lock)
 					{
-						m_files.Add(value);
-						m_pathHashLookup[value.Path] = value;
+						foreach (var value in JsonSerializer.Deserialize<HashedFile[]>(File.ReadAllText(HashFileName))!)
+						{
+							m_files.Add(value);
+							m_pathHashLookup[value.Path] = value;
+						}
 					}
 				}
 			}
@@ -41,74 +44,82 @@ namespace DuplicateFinder.Bl.Storage
 			}
 		}
 
-		public IEnumerable<HashedFile> EnumerateHashedFiles()
-		{
-			return m_files;
-		}
-
 		public IEnumerable<HashedFile> FindDuplicates()
 		{
 			var result = new List<HashedFile>();
-			while (result.Count < 2)
+			lock (m_lock)
 			{
-				result = m_files.GroupBy(x => x.Hash, new ByteArrayComparer())
-					         .OrderBy(x => x.Key, new ByteArraySortComparer())
-					         .Where(x => x.Count() > 1)
-					         .Skip(m_skipCount)
-					         .Take(1)
-					         .ToList()
-					         .FirstOrDefault()
-							 ?.ToList() ??
-				         new List<HashedFile>();
-				result = result.ToList();
-				if (result.Count == 0)
+				while (result.Count < 2)
 				{
-					if (m_skipCount == 0)
+					result = m_files.GroupBy(x => x.Hash, new ByteArrayComparer())
+						         .OrderBy(x => x.Key, new ByteArraySortComparer())
+						         .Where(x => x.Count() > 1)
+						         .Skip(m_skipCount)
+						         .Take(1)
+						         .ToList()
+						         .FirstOrDefault()
+						         ?.ToList() ??
+					         new List<HashedFile>();
+					result = result.ToList();
+					if (result.Count == 0)
 					{
-						return result;
+						if (m_skipCount == 0)
+						{
+							return result;
+						}
+
+						m_skipCount = 0;
 					}
-					m_skipCount = 0;
-				}
-				foreach (var file in result.ToList())
-				{
-					if (!File.Exists(file.Path))
+
+					foreach (var file in result.ToList())
 					{
-						result.Remove(file);
-						Remove(file);
-						Persist();
+						if (!File.Exists(file.Path))
+						{
+							result.Remove(file);
+							Remove(file);
+							Persist();
+						}
 					}
 				}
 			}
-
 			return result;
 		}
 
 		public void SkipDuplicate()
 		{
-			m_skipCount++;
+			lock (m_lock)
+			{
+				m_skipCount++;
+			}
 		}
 
 		public void Remove(HashedFile existing)
 		{
-			m_files.Remove(existing);
-			m_pathHashLookup.Remove(existing.Path);
+			lock (m_lock)
+			{
+				m_files.Remove(existing);
+				m_pathHashLookup.Remove(existing.Path);
+			}
 		}
 
 		public void AddNewItem(HashedFile hashedFile)
 		{
-			if (!m_files.Add(hashedFile))
+			lock (m_lock)
 			{
-				// only the case if something went wrong -- add same file again to update HashDate
-				m_files.Remove(hashedFile);
-				m_files.Add(hashedFile);
-			}
+				if (!m_files.Add(hashedFile))
+				{
+					// only the case if something went wrong -- add same file again to update HashDate
+					m_files.Remove(hashedFile);
+					m_files.Add(hashedFile);
+				}
 
-			m_pathHashLookup[hashedFile.Path] = hashedFile;
+				m_pathHashLookup[hashedFile.Path] = hashedFile;
+			}
 		}
 
 		public void Persist()
 		{
-			lock (m_writeLock)
+			lock (m_lock)
 			{
 				File.WriteAllText(HashFileName, JsonSerializer.Serialize(m_files.ToArray()));
 			}
@@ -116,20 +127,27 @@ namespace DuplicateFinder.Bl.Storage
 
 		public bool IsHashUpToDate(string file)
 		{
-			return m_pathHashLookup.TryGetValue(file, out var hashedFile) &&
-			       hashedFile.HashDate > File.GetLastWriteTimeUtc(file);
+			lock (m_lock)
+			{
+				return m_pathHashLookup.TryGetValue(file, out var hashedFile) &&
+				       hashedFile.HashDate > File.GetLastWriteTimeUtc(file);
+			}
 		}
 
 		public void Choose(string path)
 		{
 			try
 			{
-				if (m_pathHashLookup.TryGetValue(path, out var hash))
+				lock (m_lock)
 				{
-					foreach (var hashedFile in m_files.Where(x => x.Hash.SequenceEqual(hash.Hash) && x.Path != path))
+					if (m_pathHashLookup.TryGetValue(path, out var hash))
 					{
-						FileSystem.DeleteFile(hashedFile.Path, UIOption.AllDialogs, RecycleOption.SendToRecycleBin);
-						Remove(hashedFile);
+						foreach (var hashedFile in m_files.Where(x =>
+							         x.Hash.SequenceEqual(hash.Hash) && x.Path != path))
+						{
+							FileSystem.DeleteFile(hashedFile.Path, UIOption.AllDialogs, RecycleOption.SendToRecycleBin);
+							Remove(hashedFile);
+						}
 					}
 				}
 			}
@@ -145,21 +163,24 @@ namespace DuplicateFinder.Bl.Storage
 		/// </summary>
 		public IReadOnlyCollection<string> DetermineModifiedFolders(IReadOnlyCollection<string> rootFolders)
 		{
-			// get minimum hash date per hashed folder
-			var hashedFolders = m_files.Select(x => new
-				{
-					Path = Path.GetDirectoryName(x.Path),
-					x.HashDate
-				})
-				.GroupBy(x => x.Path)
-				.Select(grp => new
-				{
-					Path = grp.Key,
-					HashDate = grp.Min(x => x.HashDate)
-				})
-				.Where(x => x.Path != null)
-				.ToDictionary(x => x.Path!, x => x.HashDate);
-			return DetermineModifiedFoldersInternal(rootFolders, hashedFolders);
+			lock (m_lock)
+			{
+				// get minimum hash date per hashed folder
+				var hashedFolders = m_files.Select(x => new
+					{
+						Path = Path.GetDirectoryName(x.Path),
+						x.HashDate
+					})
+					.GroupBy(x => x.Path)
+					.Select(grp => new
+					{
+						Path = grp.Key,
+						HashDate = grp.Min(x => x.HashDate)
+					})
+					.Where(x => x.Path != null)
+					.ToDictionary(x => x.Path!, x => x.HashDate);
+				return DetermineModifiedFoldersInternal(rootFolders, hashedFolders);
+			}
 		}
 
 		private IReadOnlyCollection<string> DetermineModifiedFoldersInternal(IReadOnlyCollection<string> rootFolders,
@@ -192,11 +213,6 @@ namespace DuplicateFinder.Bl.Storage
 			}
 
 			return result;
-		}
-
-		public IReadOnlyCollection<string> GetHashedFolders()
-		{
-			return m_files.Select(x => Path.GetDirectoryName(x.Path)).Where(x => x != null).Distinct().ToList()!;
 		}
 
 		private class ByteArraySortComparer : IComparer<byte[]>
